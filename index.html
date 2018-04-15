@@ -8,24 +8,241 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 	<title>基于weui的三级级联</title>
   <link rel="stylesheet" href="https://res.wx.qq.com/open/libs/weui/1.1.2/weui.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/mint-ui/lib/style.css">
+  <style>
+    *{ box-sizing: border-box; }
+
+    body, html {
+      background-color: #fafafa;
+      -webkit-overflow-scrolling: touch;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+
+    .mint-popup{
+      width: 100%;
+      height: 100%;
+    }
+
+    .province-list{
+      background-color: #fafafa;
+      overflow: auto;
+      position: absolute;
+      top: 0;right: 0;bottom: 60px;left: 0;
+    }
+
+    .addr-picker,
+    .confirm-province{
+      position: absolute;
+      left: 0;bottom: 0;
+      border-radius: 0;
+    }
+  </style>
 </head>
 <body ontouchstart="">
+  <div id="app">
+    <form method="POST" id="options" class="menu">
+      <mt-cell title="地址">
+        {{ pca }}
+      </mt-cell>
 
+      <mt-radio
+        title="配置显示列数"
+        v-model="columnSelected"
+        :options="columns">
+      </mt-radio>
+
+      <label class="mint-checklist-title">配置省份列表</label>
+      <mt-cell id="confirm-province" :label="provincePicked.join(', ') || '省份'" is-link>
+      </mt-cell>
+      <mt-popup v-model="provincePopupVisible" position="bottom">
+        <mt-checklist class="province-list" 
+          title="配置省份列表"
+          v-model="provincePicked"
+          :options="provinces">
+        </mt-checklist>
+        <mt-button class="confirm-province" @click.native="confirmProvince" type="danger" size="large">确定</mt-button>
+      </mt-popup>
+
+      <label class="mint-checklist-title">配置城市列表</label>
+      <template v-for="(group, groupIndex) in cityGroups" :key="groupIndex">
+        <mt-cell
+          :title="group.province"
+          label=""
+          is-link>
+        </mt-cell>
+      </template>
+      <mt-popup v-model="cityGroupPopupVisible" position="bottom">
+        <mt-checklist class="province-list" 
+          title="配置省份列表"
+          v-model="provincePicked"
+          :options="provinces">
+        </mt-checklist>
+        <mt-button class="confirm-province" @click.native="confirmProvince" type="danger" size="large">确定</mt-button>
+      </mt-popup>
+
+      <!-- <template v-if="isShowCityGroup">
+        <div id="city-block" class="group">
+          <template v-for="(group, groupIndex) in cityGroups" :key="groupIndex">
+            <h3>{{ group.province }}</h3>
+            <div>
+              <label v-for="(city, cityIndex) in group.citys" :key="cityIndex" :for="`city-${group.province}-${cityIndex}`">
+                <input :type="isCityGroupsCheckbox ? 'checkbox' : 'radio'" name="cityGroups" :id="`city-${group.province}-${cityIndex}`" v-model="cityGroupPicked" :value="{ [group.province] : city }">
+                <span>{{ city }}</span>
+              </label>
+              &nbsp;
+            </div>
+            <br>
+          </template>
+        </div>
+      </template> -->
+
+      <mt-button class="addr-picker" @click.native="initAddrPicker" type="danger" size="large">测试选择器</mt-button>
+    </form>
+  </div>
 </body>
 <script type="text/javascript" src="https://res.wx.qq.com/open/libs/weuijs/1.1.3/weui.min.js"></script>
+<script src="https://vuejs.org/js/vue.min.js"></script>
+<script src="https://unpkg.com/mint-ui/lib/index.js"></script>
 <script src="./src/pca.js"></script>
 <script src="./src/main.js"></script>
 <script>
   window.onload = function() {
-    weui.picker(WX_PCA, {
-      defaultValue: ["广东深", "广州市", "海珠区"],
-      onChange: function (result) {
-          /* console.log(result) */
+    const vm = new Vue({
+      data: {
+
+        value: "",
+
+        isShowPage: false,
+
+        pca: "",
+
+        columns: [
+          { label: '单列', value: 1 },
+          { label: '双列', value: 2 },
+          { label: '三列', value: 3 }
+        ],
+        columnSelected: 1,
+
+        isProvinceCheckbox: false,
+        provincePopupVisible: false
+        provinces: pca.getProvinceLiist(),
+        provincePicked: [],
+
+        isShowCityGroup: true,
+        isCityGroupsCheckbox: false,
+        cityGroupPopupVisible: false,
+        cityGroups: [],
+        cityGroupPicked: []
       },
-      onConfirm: function (result) {
-          console.log(result)
+      mounted() {
+        const confirmProvinceEle = document.querySelector("#confirm-province");
+
+        confirmProvinceEle.addEventListener('click', () => {
+          this.provincePopupVisible = true;
+        });
+      },
+      watch: {
+        columnSelected(val) {
+          const CHECKBOX = true, RADIO = false;
+          const HIDE_CITYGROUP_BLOCK = false, SHOW_CITYGROUP_BLOCK = true;
+
+          if(val === 1) {
+            this.isProvinceCheckbox = RADIO;
+            this.isCityGroupsCheckbox = RADIO;
+            this.isShowCityGroup = SHOW_CITYGROUP_BLOCK;
+            this.provincePicked = [];
+            this.cityGroupPicked = [];
+
+          } else if(val === 2) {
+            this.isProvinceCheckbox = RADIO;
+            this.isCityGroupsCheckbox = CHECKBOX;
+            this.isShowCityGroup = SHOW_CITYGROUP_BLOCK;
+            this.provincePicked = [];
+            this.cityGroupPicked = [];
+
+          } else {
+            this.isProvinceCheckbox = CHECKBOX;
+            this.isShowCityGroup = HIDE_CITYGROUP_BLOCK;
+            this.provincePicked = [];
+            this.cityGroupPicked = [];
+
+          }
+        },
+        provincePicked(val) {
+          let cityGroups = [];
+          let isArray = Object.prototype.toString.call(val) === "[object Array]";
+
+          if(isArray) {
+            val.forEach(item => {
+              let _citys = pca.getCityLiistBy(item);
+              cityGroups.push({
+                province: item,
+                citys: _citys
+              });
+            });
+          } else {
+            let _citys = pca.getCityLiistBy(val);
+            cityGroups.push({
+              province: val,
+              citys: _citys
+            });
+          }
+
+          this.cityGroups = cityGroups;
+        }
+      },
+      methods: {
+        _setWeuiPicker(data) {
+          const _this = this;
+          
+          weui.picker(data, {
+            onChange: function (result) {
+              /* console.log(result) */
+            },
+            onConfirm: function (result) {
+              let pca = result.map(item => item.value);
+              _this.pca = pca.join(" ");
+            }
+          });
+        },
+        initAddrPicker(e) {
+          let data;
+          let columnSelected = this.columnSelected, 
+            provincePicked = this.provincePicked, 
+            cityGroupPicked = this.cityGroupPicked;
+
+          if(columnSelected === 1) {
+            data = pca.get(provincePicked, cityGroupPicked[provincePicked]);
+            this._setWeuiPicker(data);
+          } else if(columnSelected === 2) {
+            console.log(cityGroupPicked);
+
+            if(cityGroupPicked.length) {
+              let citys = cityGroupPicked.map(item => item[provincePicked]);
+              data = pca.get(provincePicked, citys);
+
+            } else {
+              data = pca.get(provincePicked);
+
+            }
+
+            this._setWeuiPicker(data);
+          } else {
+            data = pca.get(provincePicked);
+            this._setWeuiPicker(data);
+          }
+
+          e.preventDefault();
+        },
+        confirmProvince(e) {
+          this.provincePopupVisible = false;
+          return e.preventDefault();
+        }
       }
-    });
-  };
+    }).$mount('#app')
+  }
 </script>
 </html>
